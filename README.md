@@ -114,28 +114,28 @@ Scheduler behaviors you can see: sorting by time and priority, filtering by pet 
 python -m pytest
 ```
 
-The 14 tests cover:
+The 18 tests cover:
 
 - Task completion and adding a task to a pet
 - Sorting by time across pets and sorting by priority
 - Filtering by pet name and by status
 - Daily and weekly recurrence, no recurrence for one-time tasks, and no duplicate when a task is completed twice
 - Conflict detection across pets, no false conflicts, and completed tasks being ignored
-- Edge cases: a pet or owner with no tasks, and an invalid priority
+- Edge cases: a pet or owner with no tasks, an invalid priority, and malformed times (`9:00`, `25:99`, empty)
 
 ```
 ============================= test session starts =============================
 platform win32 -- Python 3.12.3, pytest-9.1.1, pluggy-1.7.0
 rootdir: C:\Dev\ai110-module2show-pawpal-starter
 plugins: anyio-4.15.1
-collected 14 items
+collected 18 items
 
-tests\test_pawpal.py ..............                                      [100%]
+tests\test_pawpal.py ..................                                  [100%]
 
-============================= 14 passed in 1.13s ==============================
+============================= 18 passed in 0.45s ==============================
 ```
 
-**Confidence level: ★★★★☆ (4/5).** The scheduling logic is covered by passing tests and the UI flow was exercised end to end. The missing star is for overlapping durations, time zones and bad `HH:MM` input, which are not handled or tested.
+**Confidence level: ★★★★☆ (4/5).** The scheduling logic is covered by passing tests and the UI flow was exercised end to end. The missing star is for overlapping durations and time zones, which are not handled or tested.
 
 ## Project files
 

@@ -18,7 +18,7 @@ I used dataclasses for `Task`, `Pet` and `Owner` because they are mostly data. `
 - I added a `pet_name` field to `Task`, and `Pet.add_task()` fills it in. Without it the scheduler could not filter by pet, could not say which pet a conflict belongs to, and could not find the right pet to attach the next occurrence of a recurring task to.
 - `mark_task_complete()` returns early if a task is already completed. The first version would have created a second copy of a daily task if the button was pressed twice, so I added that guard and a test for it.
 - Conflict detection ignores completed tasks, since a finished task at 08:00 should not block a new one.
-- [[FILL IN: one change you made because of the feedback from AI chat #1, or write "I did not change the design after the review" if that is true.]]
+- After an AI design review of my skeleton, I added validation of the `time` field in `Task.__post_init__`. Times are plain strings, so `"9:00"` would sort after `"10:00"` and `"25:99"` would be accepted without complaint. Now only zero-padded `HH:MM` values are allowed, and I added tests for it.
 
 ---
 
@@ -40,11 +40,11 @@ The scheduler looks at the time of day and the due date first, because a pet own
 
 I used Claude Code in VS Code as the main tool. I had it help plan the order of work, draft the UML, write the class skeleton, implement the classes and algorithms, write the demo script and the tests, build the Streamlit page, and draft the README. I used separate chats for separate jobs: one to review the skeleton, one to plan edge-case tests, and one to look at simplifying an algorithm. The prompts that worked best were specific ones that named the file and the question, such as asking for the three most important problems in the skeleton rather than "review my code".
 
-[[FILL IN: one sentence on how keeping those chats separate helped, in your own words.]]
+Keeping each review in its own chat meant each answer stayed focused on one question, and the three answers could be compared without one conversation's assumptions leaking into another. Two of the chats independently pointed at the same weakness, the unvalidated `time` string, which made me take it seriously.
 
 **b. Judgment and verification**
 
-[[FILL IN: describe one real suggestion from the AI chats that you rejected or changed, what it was, and why. This must be something that actually happened.]]
+The design-review chat suggested replacing the `pet_name` string on `Task` with a back-reference to its `Pet`, and also rewriting `detect_conflicts` to compare start and end times so overlapping durations are caught. I did not take either. A back-reference makes `Task` and `Pet` depend on each other, which is more than this project needs, and unique pet names (the UI already rejects duplicates) cover the risk. Overlap checking would turn a simple, readable method into an interval algorithm, so I kept exact-time matching and documented it as a tradeoff in section 2b. A third chat proposed a shorter `defaultdict` plus list-comprehension version of `detect_conflicts`. I kept my original explicit loop because it is easier to read and to extend with extra message details, and the chat itself said the original was already close to optimal. The one suggestion I did accept was time validation, because it fixed a real bug.
 
 I did not take the code on trust. I ran `python main.py` and checked the output by eye against what I expected, ran `python -m pytest` until all tests passed, and ran the Streamlit app, adding pets and tasks, creating a same-time conflict and completing a daily task to see the next day's task appear.
 
@@ -54,11 +54,11 @@ I did not take the code on trust. I ran `python main.py` and checked the output 
 
 **a. What you tested**
 
-I wrote 14 tests. They cover task completion, adding tasks to a pet, sorting by time across two pets, sorting by priority, filtering by pet and by status, daily and weekly recurrence, one-time tasks not recurring, completing a task twice, conflicts across pets, no false conflicts, completed tasks being ignored in conflict checks, empty pets and owners, and an invalid priority. These matter because sorting, recurrence and conflicts are the parts that make the app useful, and they are easy to get subtly wrong.
+I wrote 18 tests. They cover task completion, adding tasks to a pet, sorting by time across two pets, sorting by priority, filtering by pet and by status, daily and weekly recurrence, one-time tasks not recurring, completing a task twice, conflicts across pets, no false conflicts, completed tasks being ignored in conflict checks, empty pets and owners, an invalid priority, and malformed times. These matter because sorting, recurrence and conflicts are the parts that make the app useful, and they are easy to get subtly wrong.
 
 **b. Confidence**
 
-I am fairly confident (4 out of 5). The core behaviors are tested and pass, and I ran the UI flow end to end. What I would test next: overlapping durations, tasks that cross midnight, badly formatted times, a pet name that appears twice, and weekly tasks completed late.
+I am fairly confident (4 out of 5). The core behaviors are tested and pass, and I ran the UI flow end to end. What I would test next: overlapping durations, tasks that cross midnight, overdue tasks (today's schedule drops them), a recurring task completed late, a pet name that appears twice, and weekly tasks completed late.
 
 ---
 

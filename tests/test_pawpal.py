@@ -144,6 +144,12 @@ def test_pet_with_no_tasks_and_empty_owner(setup):
     assert scheduler.todays_schedule() == []
 
 
+@pytest.mark.parametrize("bad_time", ["9:00", "25:99", "", "noon"])
+def test_malformed_time_is_rejected(bad_time):
+    with pytest.raises(ValueError):
+        Task("Walk", bad_time)
+
+
 def test_invalid_priority_is_rejected():
     with pytest.raises(ValueError):
         Task("Walk", "07:30", priority="urgent")

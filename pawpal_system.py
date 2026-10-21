@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 PRIORITIES = {"high": 0, "medium": 1, "low": 2}
@@ -21,7 +21,13 @@ class Task:
     pet_name: str = ""
 
     def __post_init__(self) -> None:
-        """Reject priorities and frequencies we don't know how to handle."""
+        """Reject times, priorities and frequencies we don't know how to handle."""
+        try:
+            datetime.strptime(self.time, "%H:%M")
+        except ValueError:
+            raise ValueError("time must look like HH:MM, e.g. 07:30") from None
+        if len(self.time) != 5:
+            raise ValueError("time must be zero-padded, e.g. 07:30")
         if self.priority not in PRIORITIES:
             raise ValueError(f"priority must be one of {list(PRIORITIES)}")
         if self.frequency not in FREQUENCIES:
