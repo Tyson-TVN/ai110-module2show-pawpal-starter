@@ -1,6 +1,10 @@
+from pathlib import Path
+
 import streamlit as st
 
 from pawpal_system import Owner, Pet, Scheduler, Task
+
+DATA_FILE = Path(__file__).with_name("data.json")
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 st.title("🐾 PawPal+")
@@ -8,9 +12,17 @@ st.caption("Plan feedings, walks, meds and appointments for all your pets.")
 
 # Streamlit reruns this script on every click, so the Owner lives in session_state.
 if "owner" not in st.session_state:
-    st.session_state.owner = Owner("Jordan")
+    try:
+        st.session_state.owner = Owner.load_from_json(str(DATA_FILE))
+    except (FileNotFoundError, ValueError, KeyError, TypeError):
+        st.session_state.owner = Owner("Jordan")
 owner = st.session_state.owner
 scheduler = Scheduler(owner)
+
+
+def save():
+    """Write everything to data.json so it is still there next run."""
+    owner.save_to_json(str(DATA_FILE))
 
 
 def rows(tasks):
@@ -41,11 +53,15 @@ def complete_selected():
             if nxt:
                 msg += f" Next one scheduled for {nxt.due_date}."
             st.session_state.flash = msg
+            save()
             return
 
 
 st.subheader("Owner")
-owner.name = st.text_input("Owner name", value=owner.name)
+new_name = st.text_input("Owner name", value=owner.name)
+if new_name != owner.name:
+    owner.name = new_name
+    save()
 
 st.subheader("Add a pet")
 with st.form("add_pet", clear_on_submit=True):
@@ -58,6 +74,7 @@ with st.form("add_pet", clear_on_submit=True):
             st.error(f"You already have a pet named {pet_name.strip()}.")
         else:
             owner.add_pet(Pet(pet_name.strip(), species))
+            save()
             st.success(f"Added {pet_name.strip()} the {species}.")
 
 st.subheader("Schedule a task")
@@ -84,6 +101,7 @@ else:
                     Task(description.strip(), at.strftime("%H:%M"), due,
                          int(minutes), priority, frequency)
                 )
+                save()
                 st.success(f"Scheduled '{description.strip()}' for {target} at {at.strftime('%H:%M')}.")
 
 st.divider()
@@ -129,3 +147,17 @@ if pending:
         key="complete_choice",
     )
     st.button("Mark complete", on_click=complete_selected)
+
+st.divider()
+st.subheader("Find a free slot")
+c1, c2 = st.columns(2)
+with c1:
+    slot_minutes = st.number_input("Task length (minutes)", 1, 600, 30, key="slot_minutes")
+with c2:
+    slot_date = st.date_input("Day", key="slot_date")
+if st.button("Find next available slot"):
+    slot = scheduler.next_available_slot(int(slot_minutes), slot_date)
+    if slot:
+        st.success(f"A {int(slot_minutes)} minute task fits at {slot} on {slot_date}.")
+    else:
+        st.warning("No free slot that day between 07:00 and 21:00.")
