@@ -30,7 +30,7 @@ The scheduler looks at the time of day and the due date first, because a pet own
 
 **b. Tradeoffs**
 
-`detect_conflicts()` only flags tasks that start at exactly the same date and time. It does not notice that a 45 minute grooming session starting at 08:00 overlaps a feeding at 08:30. I kept it this way because exact matching is simple to read, simple to test, and catches the most obvious double-booking. Real overlap checking would need start and end times and a more complicated comparison. For a household with a few pets it is reasonable, and the warning is advice rather than a block, so a missed overlap does not break anything.
+`detect_conflicts()` only flags tasks that start at exactly the same date and time. It does not notice that a 45 minute grooming session starting at 08:00 overlaps a feeding at 08:30. I kept it this way because exact matching is simple to read, simple to test, and catches the most obvious double-booking. Real overlap checking would need start and end times and a more complicated comparison. For a household with a few pets it is reasonable, and the warning is advice rather than a block, so a missed overlap does not break anything. Later I added `next_available_slot()`, which does use durations to find free time, so the overlap logic exists in the project. I left `detect_conflicts()` as exact-match anyway, to keep the warning simple and predictable.
 
 ---
 
@@ -54,7 +54,7 @@ I did not take the code on trust. I ran `python main.py` and checked the output 
 
 **a. What you tested**
 
-I wrote 18 tests. They cover task completion, adding tasks to a pet, sorting by time across two pets, sorting by priority, filtering by pet and by status, daily and weekly recurrence, one-time tasks not recurring, completing a task twice, conflicts across pets, no false conflicts, completed tasks being ignored in conflict checks, empty pets and owners, an invalid priority, and malformed times. These matter because sorting, recurrence and conflicts are the parts that make the app useful, and they are easy to get subtly wrong.
+I wrote 27 tests. They cover task completion, adding tasks to a pet, sorting by time across two pets, sorting by priority, filtering by pet and by status, daily and weekly recurrence, one-time tasks not recurring, completing a task twice, conflicts across pets, no false conflicts, completed tasks being ignored in conflict checks, empty pets and owners, an invalid priority, malformed times, the free-slot finder, and saving and loading JSON. These matter because sorting, recurrence and conflicts are the parts that make the app useful, and they are easy to get subtly wrong.
 
 **b. Confidence**
 
@@ -70,7 +70,7 @@ Building the logic and the terminal demo before the web page. When I got to the 
 
 **b. What you would improve**
 
-I would make conflict detection duration-aware and let the owner edit or delete tasks in the UI. I would also save pets and tasks to a file so they survive closing the app.
+I would make conflict detection duration-aware and let the owner edit or delete tasks in the UI. Saving to a file is done now, but it is a single JSON file with no handling for two copies of the app writing at once.
 
 **c. Key takeaway**
 
