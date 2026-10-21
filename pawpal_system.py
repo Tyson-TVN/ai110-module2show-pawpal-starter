@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field, replace
+import json
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
@@ -37,6 +38,19 @@ class Task:
         """Mark this task as done."""
         self.completed = True
 
+    def to_dict(self) -> dict:
+        """Return a JSON-friendly dict (the date becomes an ISO string)."""
+        data = asdict(self)
+        data["due_date"] = self.due_date.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Task":
+        """Rebuild a task from the dict made by to_dict()."""
+        data = dict(data)
+        data["due_date"] = date.fromisoformat(data["due_date"])
+        return cls(**data)
+
 
 @dataclass
 class Pet:
@@ -60,6 +74,19 @@ class Pet:
         """Return a copy of this pet's task list."""
         return list(self.tasks)
 
+    def to_dict(self) -> dict:
+        """Return a JSON-friendly dict of this pet and its tasks."""
+        return {"name": self.name, "species": self.species,
+                "tasks": [t.to_dict() for t in self.tasks]}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Pet":
+        """Rebuild a pet and its tasks from to_dict() output."""
+        pet = cls(data["name"], data["species"])
+        for task_data in data.get("tasks", []):
+            pet.add_task(Task.from_dict(task_data))
+        return pet
+
 
 @dataclass
 class Owner:
@@ -82,6 +109,26 @@ class Owner:
     def get_all_tasks(self) -> List[Task]:
         """Return every task from every pet in one list."""
         return [task for pet in self.pets for task in pet.tasks]
+
+    def to_dict(self) -> dict:
+        """Return a JSON-friendly dict of the owner, pets and tasks."""
+        return {"name": self.name, "pets": [p.to_dict() for p in self.pets]}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Owner":
+        """Rebuild an owner from to_dict() output."""
+        return cls(data["name"], [Pet.from_dict(p) for p in data.get("pets", [])])
+
+    def save_to_json(self, path: str) -> None:
+        """Write the owner, pets and tasks to a JSON file."""
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.to_dict(), f, indent=2)
+
+    @classmethod
+    def load_from_json(cls, path: str) -> "Owner":
+        """Read an owner back from a JSON file written by save_to_json()."""
+        with open(path, encoding="utf-8") as f:
+            return cls.from_dict(json.load(f))
 
 
 class Scheduler:
@@ -140,6 +187,34 @@ class Scheduler:
         if pet is not None:
             pet.add_task(next_task)
         return next_task
+
+    def next_available_slot(self, duration_minutes: int, on_date: date,
+                            day_start: str = "07:00",
+                            day_end: str = "21:00") -> Optional[str]:
+        """Return the earliest HH:MM where a task of this length fits, or None."""
+        if duration_minutes <= 0:
+            raise ValueError("duration_minutes must be positive")
+
+        def to_minutes(hhmm: str) -> int:
+            hours, minutes = hhmm.split(":")
+            return int(hours) * 60 + int(minutes)
+
+        # Busy blocks (start, end) of pending tasks that day, earliest first.
+        busy = sorted(
+            (to_minutes(t.time), to_minutes(t.time) + max(t.duration_minutes, 0))
+            for t in self.owner.get_all_tasks()
+            if not t.completed and t.due_date == on_date
+        )
+
+        candidate = to_minutes(day_start)
+        for start, end in busy:
+            if start >= candidate + duration_minutes:
+                break  # the gap before this block is big enough
+            candidate = max(candidate, end)  # otherwise move past it
+
+        if candidate + duration_minutes <= to_minutes(day_end):
+            return f"{candidate // 60:02d}:{candidate % 60:02d}"
+        return None
 
     def todays_schedule(self) -> List[Task]:
         """Return today's tasks in time order."""

@@ -153,3 +153,85 @@ def test_malformed_time_is_rejected(bad_time):
 def test_invalid_priority_is_rejected():
     with pytest.raises(ValueError):
         Task("Walk", "07:30", priority="urgent")
+
+
+# --- next available slot ---------------------------------------------------
+
+def slot_setup(*tasks):
+    owner = Owner("Jordan")
+    pet = Pet("Mochi", "dog")
+    owner.add_pet(pet)
+    for t in tasks:
+        pet.add_task(t)
+    return Scheduler(owner)
+
+
+def test_next_slot_empty_day_is_start_of_window():
+    scheduler = slot_setup()
+    assert scheduler.next_available_slot(30, date.today()) == "07:00"
+
+
+def test_next_slot_skips_past_busy_task():
+    scheduler = slot_setup(Task("Walk", "07:00", duration_minutes=45))
+    assert scheduler.next_available_slot(30, date.today()) == "07:45"
+
+
+def test_next_slot_uses_gap_between_tasks():
+    scheduler = slot_setup(Task("Walk", "07:00", duration_minutes=30),
+                           Task("Vet", "09:00", duration_minutes=60))
+    assert scheduler.next_available_slot(60, date.today()) == "07:30"
+    assert scheduler.next_available_slot(90, date.today()) == "07:30"  # exact fit
+    assert scheduler.next_available_slot(100, date.today()) == "10:00"
+
+
+def test_next_slot_handles_back_to_back_and_nested_tasks():
+    scheduler = slot_setup(Task("A", "07:00", duration_minutes=60),
+                           Task("B", "07:10", duration_minutes=10),
+                           Task("C", "08:00", duration_minutes=30))
+    assert scheduler.next_available_slot(15, date.today()) == "08:30"
+
+
+def test_next_slot_ignores_completed_and_other_days():
+    done = Task("Walk", "07:00", duration_minutes=60)
+    tomorrow = Task("Walk", "07:00", duration_minutes=60,
+                    due_date=date.today() + timedelta(days=1))
+    scheduler = slot_setup(done, tomorrow)
+    done.mark_complete()
+    assert scheduler.next_available_slot(30, date.today()) == "07:00"
+
+
+def test_next_slot_returns_none_when_day_is_full():
+    scheduler = slot_setup(Task("All day", "07:00", duration_minutes=840))
+    assert scheduler.next_available_slot(15, date.today()) is None
+
+
+def test_next_slot_rejects_non_positive_duration():
+    with pytest.raises(ValueError):
+        slot_setup().next_available_slot(0, date.today())
+
+
+# --- persistence -----------------------------------------------------------
+
+def test_save_and_load_round_trip(tmp_path):
+    owner = Owner("Jordan")
+    mochi = Pet("Mochi", "dog")
+    owner.add_pet(mochi)
+    mochi.add_task(Task("Walk", "07:30", duration_minutes=30, priority="high",
+                        frequency="daily"))
+    done = Task("Bath", "10:00", due_date=date(2026, 1, 5))
+    mochi.add_task(done)
+    done.mark_complete()
+
+    path = tmp_path / "data.json"
+    owner.save_to_json(str(path))
+    loaded = Owner.load_from_json(str(path))
+
+    assert loaded == owner
+    assert loaded.pets[0].tasks[0].pet_name == "Mochi"
+    assert loaded.pets[0].tasks[1].completed is True
+    assert loaded.pets[0].tasks[1].due_date == date(2026, 1, 5)
+
+
+def test_load_missing_file_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        Owner.load_from_json(str(tmp_path / "nope.json"))
